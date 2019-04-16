@@ -24,6 +24,8 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+
+
 .icon-times:before {
   content: "\e930";
 }
@@ -1788,4 +1790,6 @@
 .icon-IcoMoon:before {
   content: "\eb1a";
 }
-
+.icon-medium:before {
+  content: "\eb1b";
+}
