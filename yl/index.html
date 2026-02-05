@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yanlin's Climbing Log</title>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+    <style>
+        body { font-family: -apple-system, sans-serif; padding: 20px; background: #fafafa; }
+        .card { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; }
+        button { 
+            background: #d53369; /* A vibrant pink to match the icon */
+            color: white; 
+            border: none; 
+            font-weight: bold; 
+            transition: 0.2s;
+        }
+        button:active {
+            background: #c71585; /* Darker pink when pressed */
+        }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 14px; }
+        th, td { text-align: left; padding: 8px; border-bottom: 1px solid #eee; }
+        .chart-container { height: 400px; width: 100%; }
+        #success-overlay {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 40px;
+            font-weight: bold;
+            color: #d53369;
+            text-shadow: 2px 2px 10px rgba(0,0,0,0.2);
+            z-index: 9999;
+        }
+    </style>
+    <link rel="icon" type="image/png" href="icon.png">
+
+    <link rel="apple-touch-icon" href="icon.png">
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Climb Log">
+</head>
+<body>
+    <div id="success-overlay">NICE SEND! 🧗‍♀️</div>
+
+    <div class="card">
+        <h2>🧗‍♀️ Log a New Climb</h2>
+        <form id="climbForm">
+            <input type="date" id="date" required>
+            
+            <select id="gymSelect" onchange="toggleNewGymInput()" required>
+                <option value="Rock Oasis">Rock Oasis</option>
+                <option value="Joe Rockhead's">Joe Rockhead's</option>
+                <option value="NEW">+ Add New Gym</option>
+            </select>
+
+            <input type="text" id="newGymInput" placeholder="Enter gym name" style="display:none;">
+
+            <input type="text" id="grade" placeholder="Grade (e.g. 10+)" required>
+            <input type="text" id="notes" placeholder="Notes (optional)">
+            <button type="submit" id="submitBtn">Save Climb</button>
+        </form>
+    </div>
+
+    <div class="card">
+        <h2>📊 Progress Statistics</h2>
+        <p id="lastSync" style="font-size: 12px; color: #777; margin-top: -10px;">Last synced: --</p>
+        <div id="statsChart" class="chart-container"></div>
+    </div>
+
+    <div class="card">
+        <h2>Basics & Home Gyms</h2>
+        <div id="gymBreakdown">
+            <p style="color: #777;">Loading gym stats...</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>🕒 Recent History</h2>
+        <table id="historyTable">
+            <thead><tr><th>Date</th><th>Gym</th><th>Grade</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+    <script>
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbxPyIuvXWgrDBTvweY8t2Dy8YYvDWDUp_r0RYCNzQlzblCKKAsx5oSibiumOyuNvWWl/exec';
+        
+        function toggleNewGymInput() {
+            const select = document.getElementById('gymSelect');
+            const input = document.getElementById('newGymInput');
+            
+            if (select.value === 'NEW') {
+                input.style.display = 'block';
+                input.required = true;
+            } else {
+                input.style.display = 'none';
+                input.required = false;
+            }
+        }
+
+        // This function turns "10+", "5.11-", or "10b" into a number Plotly can graph
+        function parseGrade(gradeStr) {
+            if (!gradeStr) return null;
+            
+            // 1. Clean the string: remove "5." prefix if it exists, and lowercase it
+            let clean = gradeStr.toString().toLowerCase().replace('5.', '').trim();
+            
+            // 2. Extract the base number (e.g., "10" from "10+")
+            let baseMatch = clean.match(/\d+/);
+            if (!baseMatch) return null;
+            let base = parseInt(baseMatch[0]);
+
+            // 3. Add decimals based on suffixes
+            let modifier = 0;
+            if (clean.includes('-') || clean.includes('a')) modifier = 0.0;
+            else if (clean.includes('+') || clean.includes('c')) modifier = 0.6;
+            else if (clean.includes('b')) modifier = 0.3;
+            else if (clean.includes('d')) modifier = 0.9;
+            else modifier = 0.3; // Default for a "straight" grade like "10"
+
+            return base + modifier;
+        }
+
+        // 2. Load Data and Build Charts
+        async function loadDashboard() {
+            try {
+                const response = await fetch(scriptURL);
+                const data = await response.json();
+                
+                // Convert all entries to numerical values for the chart
+                const processedData = data.map(d => ({
+                    ...d,
+                    numGrade: parseGrade(d.grade),
+                    dateObj: new Date(d.date)
+                })).filter(d => d.numGrade !== null);
+
+                const now = new Date();
+                const oneMonthAgo = now.setMonth(now.getMonth() - 1);
+                const oneYearAgo = new Date().setFullYear(new Date().getFullYear() - 1);
+
+                // Filter into three buckets
+                const allHistory = processedData.map(d => d.numGrade);
+                const recentYear = processedData.filter(d => d.dateObj > oneYearAgo).map(d => d.numGrade);
+                const recentMonth = processedData.filter(d => d.dateObj > oneMonthAgo).map(d => d.numGrade);
+
+                // 3. Create Box Plot
+                const traceData = [
+                    { y: allHistory, type: 'box', name: 'All Time', marker: {color: '#cbd5e0'} },
+                    { y: recentYear, type: 'box', name: 'Past Year', marker: {color: '#4299e1'} },
+                    { y: recentMonth, type: 'box', name: 'Past Month', marker: {color: '#2b6cb0'} }
+                ];
+
+                const layout = {
+                    title: 'Climbing Progression (YDS)',
+                    yaxis: { 
+                        title: 'Difficulty',
+                        // We added 7 here to show 5.7 on the axis
+                        tickvals: [7, 8, 9, 10, 11, 12, 13], 
+                        ticktext: ['5.7', '5.8', '5.9', '5.10', '5.11', '5.12', '5.13'], 
+                        zeroline: false,
+                        range: [6.5, 13.5] // This ensures 5.7 is visible and not cut off at the bottom
+                    },
+                    boxmode: 'group',
+                    paper_bgcolor: '#fafafa',
+                    plot_bgcolor: '#fafafa',
+                    margin: { l: 50, r: 20, b: 50, t: 80 }
+                };
+
+                Plotly.newPlot('statsChart', traceData, layout);
+
+                // 1. Populate the Table
+                const tbody = document.querySelector("#historyTable tbody");
+                
+                // Take the last 5 entries, reverse them (newest first)
+                const recentEntries = data.slice(-5).reverse();
+                
+                tbody.innerHTML = recentEntries.map(row => {
+                    // Note: Use lowercase names here (date, gym, grade)
+                    const climbDate = row.date ? new Date(row.date).toLocaleDateString() : 'N/A';
+                    return `
+                        <tr>
+                            <td>${climbDate}</td>
+                            <td>${row.gym || '---'}</td>
+                            <td>${row.grade || '---'}</td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // UPDATE THE TIMESTAMP HERE
+                const timeString = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('lastSync').innerText = "Last synced: Today at " + timeString;
+
+                // Dynamic Gym List Population
+                const gymSelect = document.getElementById('gymSelect');
+                const existingGyms = ["Rock Oasis", "Joe Rockhead's"]; // Our defaults
+
+                // Get unique gyms from the history data
+                const historicalGyms = [...new Set(data.map(d => d.gym))];
+
+                historicalGyms.forEach(gym => {
+                    // If it's a new gym we haven't listed yet, add it to the dropdown
+                    if (gym && !existingGyms.includes(gym)) {
+                        const option = document.createElement('option');
+                        option.value = gym;
+                        option.text = gym;
+                        // Insert it before the "+ Add New Gym" option
+                        gymSelect.add(option, gymSelect.options[gymSelect.options.length - 1]);
+                        existingGyms.push(gym); // Prevent duplicates
+                    }
+                });
+
+                // Calculate Gym Statistics
+                const gymCounts = data.reduce((acc, climb) => {
+                    const name = climb.gym || "Unknown";
+                    acc[name] = (acc[name] || 0) + 1;
+                    return acc;
+                }, {});
+
+                // Sort gyms by most visits
+                const sortedGyms = Object.entries(gymCounts).sort((a, b) => b[1] - a[1]);
+
+                // Generate the HTML for the breakdown
+                const breakdownHTML = sortedGyms.map(([name, count], index) => {
+                    const isHomeGym = index === 0 && count > 0;
+                    return `
+                        <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee;">
+                            <span>
+                                <strong>${name}</strong> 
+                                ${isHomeGym ? '<span style="font-size: 10px; background: #d53369; color: white; padding: 2px 6px; border-radius: 10px; margin-left: 5px;">HOME GYM</span>' : ''}
+                            </span>
+                            <span style="font-weight: bold; color: #d53369;">${count} climbs</span>
+                        </div>
+                    `;
+                }).join('');
+
+                document.getElementById('gymBreakdown').innerHTML = breakdownHTML || "<p>No climbs logged yet!</p>";
+            } catch (error) {
+                document.getElementById('lastSync').innerText = "Sync failed. Check connection.";
+                console.error("Fetch error:", error);
+            }
+        }
+
+        // Form Submit Logic
+        let form = document.getElementById('climbForm');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            btn.disabled = true;
+            btn.innerText = "Saving...";
+
+            const gymSelect = document.getElementById('gymSelect');
+            const newGymInput = document.getElementById('newGymInput');
+
+            const payload = {
+                date: document.getElementById('date').value,
+                // Use the input value if 'NEW' is selected, otherwise use the dropdown value
+                gym: gymSelect.value === 'NEW' ? newGymInput.value : gymSelect.value,
+                grade: document.getElementById('grade').value,
+                notes: document.getElementById('notes').value
+            };
+
+            try {
+                await fetch(scriptURL, { method: 'POST', body: JSON.stringify(payload)});
+                
+                // 1. Trigger Confetti
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 },
+                    colors: ['#d53369', '#ffffff', '#ff85a2'] // Pink themed confetti!
+                });
+
+                // 2. Change button to a success state
+                btn.innerText = "Nice Send! 💪";
+                btn.style.background = "#48bb78"; // Green for success
+
+                const overlay = document.getElementById('success-overlay');
+                overlay.style.display = 'block';
+
+                // 3. Reset everything after 2 seconds
+                setTimeout(() => {
+                    // Hide overlay
+                    overlay.style.display = 'none';
+                    
+                    // Reset the form values
+                    form.reset();
+
+                    // IMPORTANT: Reset the "New Gym" field state
+                    const newGymInput = document.getElementById('newGymInput');
+                    if (newGymInput) {
+                        newGymInput.style.display = 'none';
+                        newGymInput.required = false;
+                    }
+
+                    // Restore button
+                    btn.disabled = false;
+                    btn.innerText = "Log Climb";
+                    btn.style.background = "#d53369"; // Back to pink
+                    
+                    // Refresh the data
+                    loadDashboard(); 
+                }, 2000);
+
+            } catch (error) {
+                alert("Oops, error saving!");
+                btn.disabled = false;
+                btn.innerText = "Try Again";
+            }
+        });
+
+        loadDashboard();
+    </script>
+</body>
+</html>
