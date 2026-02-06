@@ -63,7 +63,7 @@
             background-size: cover;
             background-position: center 20%; /* Focuses on the cat's face */
             position: relative;
-            border-radius: 0 0 20px 20px; /* Rounds the bottom corners */
+            border-radius: 20px 20px 20px 20px; /* Rounds the bottom corners */
             overflow: hidden;
             margin-bottom: 20px;
             box-shadow: 0 4px 15px rgba(0,0,0,0.1);
@@ -92,6 +92,20 @@
             margin: 5px 0 0 0;
             font-size: 14px;
             opacity: 0.9;
+        }
+
+        input[type="date"] {
+            font-family: inherit;
+            padding: 12px;
+            border: 2px solid #eee;
+            border-radius: 8px;
+            width: 100%;
+            font-size: 16px; /* Prevents iOS from zooming in too much */
+        }
+
+        input[type="date"]:focus {
+            border-color: #d53369; /* Match your pink theme */
+            outline: none;
         }
     </style>
     <link rel="icon" type="image/png" href="icon.png">
@@ -165,6 +179,13 @@
             "6-19": "Happy Dragon Boat Festival! 🛶",
             "9-25": "Happy Birthday, Yanlin! 🎂🧗‍♀️✨",
         };
+
+        // 2. The "Setup" function
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('date').valueAsDate = new Date();
+            checkHolidayGreeting();
+            loadDashboard();
+        });
 
         function checkHolidayGreeting() {
             const today = new Date();
@@ -479,8 +500,6 @@
                 btn.innerText = "Try Again";
             }
         });
-
-        loadDashboard();
     </script>
 </body>
 </html>
