@@ -2,7 +2,12 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yanlin's Climbing Log</title>
+    <div class="hero-container">
+        <div class="hero-overlay">
+            <h1>Yanlin's Beta</h1>
+            <p>Welcome back, Yanlin! Ready to send?</p>
+        </div>
+    </div>
     <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; padding: 20px; background: #fafafa; }
@@ -33,6 +38,61 @@
             text-shadow: 2px 2px 10px rgba(0,0,0,0.2);
             z-index: 9999;
         }
+        /* Only active on her birthday */
+        .birthday-theme h1 {
+            background: linear-gradient(to right, #d53369, #ffd700, #d53369);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: rainbow 3s linear infinite;
+        }
+
+        @keyframes rainbow {
+            from { filter: hue-rotate(0deg); }
+            to { filter: hue-rotate(360deg); }
+        }
+
+        .birthday-btn {
+            background: linear-gradient(45deg, #ffd700, #ff85a2) !important;
+            border: 2px solid #fff !important;
+        }
+
+        .hero-container {
+            width: 100%;
+            height: 320px; /* Adjust height as needed */
+            background-image: url('cat-climb.png'); /* We will host the image below */
+            background-size: cover;
+            background-position: center 20%; /* Focuses on the cat's face */
+            position: relative;
+            border-radius: 0 0 20px 20px; /* Rounds the bottom corners */
+            overflow: hidden;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+
+        .hero-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 40px 20px 20px 20px;
+            /* This gradient makes the text pop against the cat image */
+            background: linear-gradient(transparent, rgba(0,0,0,0.6));
+            color: white;
+            text-align: left;
+        }
+
+        .hero-overlay h1 {
+            margin: 0;
+            font-size: 28px;
+            color: white !important; /* Overrides previous pink color */
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .hero-overlay p {
+            margin: 5px 0 0 0;
+            font-size: 14px;
+            opacity: 0.9;
+        }
     </style>
     <link rel="icon" type="image/png" href="icon.png">
 
@@ -58,7 +118,7 @@
 
             <input type="text" id="newGymInput" placeholder="Enter gym name" style="display:none;">
 
-            <input type="text" id="grade" placeholder="Grade (e.g. 10+)" required>
+            <input type="text" id="grade" placeholder="Grades (e.g. 10, 10+, 11-)" required>
             <input type="text" id="notes" placeholder="Notes (optional)">
             <button type="submit" id="submitBtn">Save Climb</button>
         </form>
@@ -90,6 +150,48 @@
     <script>
         const scriptURL = 'https://script.google.com/macros/s/AKfycbxPyIuvXWgrDBTvweY8t2Dy8YYvDWDUp_r0RYCNzQlzblCKKAsx5oSibiumOyuNvWWl/exec';
         
+        const holidayMap2026 = {
+            // Standard & Fun Holidays
+            "1-1": "Happy New Year! 🎆",
+            "2-14": "Happy Valentine's Day, Yanlin! ❤️🧗‍♀️",
+            "2-16": "Happy Family Day! 👨‍👩‍👧‍👦",
+            "7-1": "Happy Canada Day! 🇨🇦",
+            "10-12": "Happy Thanksgiving! 🍂",
+            "12-25": "Merry Christmas! 🎄",
+
+            // Chinese Holidays (2026 specific dates)
+            "2-17": "Happy Chinese New Year! 🧧 🏮", // Year of the Horse begins
+            "3-4": "Happy Lantern Festival! 🍡",
+            "6-19": "Happy Dragon Boat Festival! 🛶",
+            "9-25": "Happy Birthday, Yanlin! 🎂🧗‍♀️✨",
+        };
+
+        function checkHolidayGreeting() {
+            const today = new Date();
+            const bdayMonth = 3; // CHANGE THIS to her birth month
+            const bdayDay = 15;   // CHANGE THIS to her birth day
+            
+            const key = `${today.getMonth() + 1}-${today.getDate()}`;
+            const greeting = holidayMap2026[key];
+
+            // Check if it is specifically her birthday
+            if (today.getMonth() + 1 === bdayMonth && today.getDate() === bdayDay) {
+                document.body.classList.add('birthday-theme');
+                document.getElementById('submitBtn').classList.add('birthday-btn');
+                
+                // Initial "Welcome" confetti
+                confetti({
+                    particleCount: 200,
+                    spread: 160,
+                    origin: { y: 0.6 }
+                });
+            }
+
+            if (greeting) {
+                showHolidayPopup(greeting);
+            }
+        }
+
         function toggleNewGymInput() {
             const select = document.getElementById('gymSelect');
             const input = document.getElementById('newGymInput');
@@ -124,6 +226,16 @@
             else modifier = 0.3; // Default for a "straight" grade like "10"
 
             return base + modifier;
+        }
+
+        function getGymHeight(gymName) {
+            const heights = {
+                "Rock Oasis": 10.5,
+                "Joe Rockhead's": 12.2,
+                "The Hub": 13.5,
+                "Basecamp": 10.5
+            };
+            return heights[gymName] || 10.5; // Default to 10.5m if gym isn't listed
         }
 
         // 2. Load Data and Build Charts
@@ -239,6 +351,23 @@
                 }).join('');
 
                 document.getElementById('gymBreakdown').innerHTML = breakdownHTML || "<p>No climbs logged yet!</p>";
+
+                // Calculate Total Vertical Meters
+                const totalMeters = data.reduce((sum, climb) => {
+                    // This assumes you add 'vertical' to your Google Sheet rows, 
+                    // or we calculate it on the fly based on the gym name
+                    return sum + getGymHeight(climb.gym);
+                }, 0);
+
+                // Add this to the top of your Gym Statistics card
+                const totalElevationHTML = `
+                    <div style="background: #fff0f5; padding: 15px; border-radius: 10px; margin-bottom: 15px; text-align: center;">
+                        <div style="font-size: 12px; color: #777; text-transform: uppercase;">Lifetime Elevation</div>
+                        <div style="font-size: 28px; font-weight: bold; color: #d53369;">${totalMeters.toLocaleString()}m</div>
+                    </div>
+                `;
+
+                document.getElementById('gymBreakdown').insertAdjacentHTML('afterbegin', totalElevationHTML);
             } catch (error) {
                 document.getElementById('lastSync').innerText = "Sync failed. Check connection.";
                 console.error("Fetch error:", error);
@@ -250,22 +379,35 @@
         form.addEventListener('submit', async (e) => {
             e.preventDefault();
             const btn = document.getElementById('submitBtn');
+            const gradeInput = document.getElementById('grade').value;
+    
+            // Split the input by commas and clean up whitespace
+            // e.g., "10, 11-" becomes ["10", "11-"]
+            const grades = gradeInput.split(',').map(g => g.trim()).filter(g => g !== "");
+
             btn.disabled = true;
-            btn.innerText = "Saving...";
+            btn.innerText = `Saving ${grades.length} climbs...`;
 
             const gymSelect = document.getElementById('gymSelect');
             const newGymInput = document.getElementById('newGymInput');
 
-            const payload = {
-                date: document.getElementById('date').value,
-                // Use the input value if 'NEW' is selected, otherwise use the dropdown value
-                gym: gymSelect.value === 'NEW' ? newGymInput.value : gymSelect.value,
-                grade: document.getElementById('grade').value,
-                notes: document.getElementById('notes').value
-            };
+            // Calculate total session meters
+            const currentGym = gymSelect.value === 'NEW' ? newGymInput.value : gymSelect.value;
+            const heightPerClimb = getGymHeight(currentGym);
+            const totalSessionMeters = (grades.length * heightPerClimb).toFixed(1); // Rounds to 1 decimal
 
             try {
-                await fetch(scriptURL, { method: 'POST', body: JSON.stringify(payload)});
+                // Send all climbs to Google Sheets
+                // We use Promise.all to send them simultaneously
+                await Promise.all(grades.map(singleGrade => {
+                    const payload = {
+                        date: document.getElementById('date').value,
+                        gym: currentGym,
+                        grade: singleGrade,
+                        notes: document.getElementById('notes').value
+                    };
+                    return fetch(scriptURL, { method: 'POST', body: JSON.stringify(payload)});
+                }));
                 
                 // 1. Trigger Confetti
                 confetti({
@@ -276,10 +418,35 @@
                 });
 
                 // 2. Change button to a success state
-                btn.innerText = "Nice Send! 💪";
+                // Inside the success block of your form submit
+                const isBirthday = document.body.classList.contains('birthday-theme');
+
+                if (isBirthday) {
+                    btn.innerText = "Birthday Send! 🎂🎁";
+                    // Trigger extra big confetti
+                    confetti({
+                        particleCount: 400,
+                        startVelocity: 30,
+                        spread: 360,
+                        origin: { x: Math.random(), y: Math.random() - 0.2 }
+                    });
+                } else {
+                    const today = new Date();
+                    const isValentines = (today.getMonth() + 1 === 2 && today.getDate() === 14);
+
+                    btn.innerText = isValentines ? "Sent with Love! ❤️" : "Nice Sends, Yanlin! 💪";
+                }
+                
                 btn.style.background = "#48bb78"; // Green for success
 
                 const overlay = document.getElementById('success-overlay');
+                overlay.innerHTML = `
+                    <div style="font-size: 24px;">NICE SENDS, YANLIN!</div>
+                    <div style="font-size: 18px; color: #555; margin-top: 10px;">
+                        Logged ${grades.length} climbs<br>
+                        <span style="color: #d53369; font-weight: bold;">+ ${totalSessionMeters}m Vertical</span>
+                    </div>
+                `;
                 overlay.style.display = 'block';
 
                 // 3. Reset everything after 2 seconds
