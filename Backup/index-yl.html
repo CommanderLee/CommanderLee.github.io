@@ -416,9 +416,12 @@
 
                 const layout = {
                     title: 'Climbing Progression (YDS)',
+                    xaxis: { 
+                        fixedrange: true // Prevents horizontal zooming/panning
+                    },
                     yaxis: { 
                         title: 'Difficulty',
-                        // We added 7 here to show 5.7 on the axis
+                        fixedrange: true, // Prevents vertical zooming/panning
                         tickvals: [7, 8, 9, 10, 11, 12, 13], 
                         ticktext: ['5.7', '5.8', '5.9', '5.10', '5.11', '5.12', '5.13'], 
                         zeroline: false,
@@ -429,8 +432,13 @@
                     plot_bgcolor: '#fafafa',
                     margin: { l: 50, r: 20, b: 50, t: 80 }
                 };
+                const config = {
+                    responsive: true,
+                    displayModeBar: false, // Hides the annoying floating menu bar
+                    scrollZoom: false,     // Specifically kills mousewheel/pinch zoom
+                };
 
-                Plotly.newPlot('statsChart', traceData, layout);
+                Plotly.newPlot('statsChart', traceData, layout, config);
 
                 // 1. Populate the Table
                 const tbody = document.querySelector("#historyTable tbody");
