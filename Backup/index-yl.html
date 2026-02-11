@@ -165,6 +165,24 @@
             border-color: #d53369; /* Match your pink theme */
             outline: none;
         }
+
+        #statsChart {
+            /* Allows vertical scrolling (pan-y) but lets the chart handle horizontal 
+            interactions or taps if needed. */
+            touch-action: pan-y !important;
+        }
+
+        #stat-best {
+            color: #d53369; /* Pink/Red for the Big Fish */
+            font-size: 1.2em;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); /* Added for a "pop" effect */
+        }
+
+        /* A little animation when she hits a new record */
+        .new-pb-glow {
+            text-shadow: 0 0 10px rgba(213, 51, 105, 0.8);
+            transform: scale(1.1);
+        }
     </style>
     <link rel="icon" type="image/png" href="icon.png">
 
@@ -180,7 +198,7 @@
     <div class="card">
         <div class="stats-row">
             <div class="stat-item">
-                <div style="font-size: 20px;">🧗‍♀️</div>
+                <div style="font-size: 20px;">🐈</div>
                 <div id="stat-count" style="font-weight:bold;">0</div>
                 <div style="font-size:10px; color:#888;">TOTAL</div>
             </div>
@@ -197,11 +215,7 @@
         </div>
     </div>
 
-    <!-- <div class="card">
-        <div id="gradeChart"></div>
-    </div> -->
-
-    <div class="fab" onclick="toggleForm()">+</div>
+    <div class="fab" onclick="toggleForm()">🐾</div>
 
     <div id="formOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1001; padding:20px; align-items:center; display:none;">
         <div class="card" style="width:100%; max-width:400px; margin:auto;">
@@ -270,6 +284,15 @@
     <script>
         const scriptURL = 'https://script.google.com/macros/s/AKfycbxPyIuvXWgrDBTvweY8t2Dy8YYvDWDUp_r0RYCNzQlzblCKKAsx5oSibiumOyuNvWWl/exec';
         
+        // Randomize the message for a fun touch!
+        const catMessages = [
+            "Purr-fect Send, Yanlin! 🐾",
+            "Meow-velous climbing, Yanlin! 🐈",
+            "Feline strong today, Yanlin! 💪🐾",
+            "That was a paws-itive session, Yanlin! ✨",
+            "Climbing like BAKER! 🐱"
+        ];
+
         const holidayMap2026 = {
             // Standard & Fun Holidays
             "1-1": "Happy New Year! 🎆",
@@ -347,9 +370,41 @@
             // Find highest grade
             const grades = data.map(d => parseGrade(d.grade));
             const maxGradeNum = Math.max(...grades);
-            
+            const pbElement = document.getElementById('stat-best');
+            const oldPB = parseFloat(pbElement.getAttribute('data-raw-grade')) || 0;
+
             // Map back from number (11.4) to string (11) for display
-            document.getElementById('stat-best').innerText = "5." + Math.floor(maxGradeNum);
+            pbElement.innerText = formatGrade(maxGradeNum);
+            pbElement.setAttribute('data-raw-grade', maxGradeNum); // Save raw number for next comparison
+
+            // 4. THE TRIGGER: If new is better than old, make it glow!
+            if (maxGradeNum > oldPB && oldPB !== 0) {
+                pbElement.classList.add('new-pb-glow');
+                
+                // Optional: Remove the glow after 3 seconds so it stays special
+                setTimeout(() => {
+                    pbElement.classList.remove('new-pb-glow');
+                }, 3000);
+
+                // This is also a great place to trigger the confetti!
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+            }
+        }
+
+        function formatGrade(num) {
+            const base = Math.floor(num); // The 10 or 11
+            const decimal = Math.round((num % 1) * 10); // Gets the .2, .5, or .8 part
+
+            let suffix = "";
+            
+            // Logic based on standard climbing grade increments
+            if (decimal >= 6) {
+                suffix = "+"; // High decimal = +
+            } else if (decimal < 3 && decimal >= 0) {
+                suffix = "-"; // Low decimal = -
+            }
+            
+            return `5.${base}${suffix}`;
         }
 
         // This function turns "10+", "5.11-", or "10b" into a number Plotly can graph
@@ -427,6 +482,7 @@
                         zeroline: false,
                         range: [6.5, 13.5] // This ensures 5.7 is visible and not cut off at the bottom
                     },
+                    dragmode: false, // Disables the "hand" tool and all dragging logic
                     boxmode: 'group',
                     paper_bgcolor: '#fafafa',
                     plot_bgcolor: '#fafafa',
@@ -596,9 +652,10 @@
                 
                 btn.style.background = "#48bb78"; // Green for success
 
+                const randomMsg = catMessages[Math.floor(Math.random() * catMessages.length)];
                 const overlay = document.getElementById('success-overlay');
                 overlay.innerHTML = `
-                    <div style="font-size: 24px;">NICE SENDS, YANLIN!</div>
+                    <div style="font-size: 24px;">${randomMsg}</div>
                     <div style="font-size: 18px; color: #555; margin-top: 10px;">
                         Logged ${grades.length} climbs<br>
                         <span style="color: #d53369; font-weight: bold;">+ ${totalSessionMeters}m Vertical</span>
