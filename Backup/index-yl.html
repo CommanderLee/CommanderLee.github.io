@@ -348,6 +348,39 @@
             }
         }
 
+        // Function to create and show the holiday popup
+        function showHolidayPopup(message) {
+            const popup = document.createElement('div');
+            
+            // Styling it to match your Glassmorphism theme
+            popup.style = `
+                position: fixed;
+                top: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                background: rgba(255, 255, 255, 0.9);
+                backdrop-filter: blur(10px);
+                color: #d53369;
+                padding: 15px 25px;
+                border-radius: 50px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+                z-index: 2000;
+                font-weight: bold;
+                text-align: center;
+                transition: opacity 1s ease, transform 0.5s ease;
+            `;
+            
+            popup.innerHTML = message;
+            document.body.appendChild(popup);
+
+            // Make it fade out and disappear after 4 seconds
+            setTimeout(() => {
+                popup.style.opacity = '0';
+                popup.style.transform = 'translate(-50%, -20px)'; // Slides up slightly as it fades
+                setTimeout(() => popup.remove(), 1000);
+            }, 4000);
+        }
+
         function toggleNewGymInput() {
             const select = document.getElementById('gymSelect');
             const input = document.getElementById('newGymInput');
